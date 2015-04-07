@@ -1,0 +1,139 @@
+#!/bin/bash
+# sh-helpers/configure
+# Isabell Cowan (c) 2015
+# https://github.com/Izzette/sh-helpers
+#
+
+SHELP_DIR="$(pwd)/"
+ID="${SHELP_DIR}configure"
+CFG_DIR="${SHELP_DIR}config.d/"
+SRC_DIR="${SHELP_DIR}src/"
+BUILD_DIR="${SHELP_DIR}build/"
+TARGETS=("connect")
+TARGETS_DIR=
+TARGETS_DEPS=()
+TARGETS_CFG=()
+for t in ${TARGETS[@]}; do
+	TARGETS_DIR["$t"]="${SRC_DIR}${t}/"
+	TARGETS_DEPS["$t"]="${TARGETS_DIR["$t"]}deps"
+	TARGETS_CFG["$t"]="${TARGETS_DIR["$t"]}configure"
+done
+SELECTED_TARGETS=()
+VERBOSITY=0
+PKGMAN_SYNC="sudo pacman -S"
+PKGMAN_QUERY="pacman -Qk"
+
+function check_dep() {
+	IFS=" "
+	local dep="$1"
+	: "Checking for dependency \"${dep}\" with \"${PKGMAN_QUERY}\""
+	${PKGMAN_QUERY[@]} ${dep}
+	if [[ 0 -ne $? ]]; then
+		: "Dependency \"${dep}\" not found"
+		: "Attempting to install missing dependency \"${dep}\" with \"${PKGMAN_SYNC}\""
+		${PKGMAN_SYNC[@]} ${dep}
+		: "Checking for dependency \"${dep}\" with \"${PKGMAN_QUERY}\" again"
+		${PKGMAN_QUERY[@]} ${dep}
+		if [[ 0 -ne $? ]]; then
+			printf "${ID}: Failed to find or install dependency \"${dep}\" with \"${pkg_man}\"\n" >&2
+			return 1
+		fi
+	fi
+	return 0
+}
+
+function loop_deps() {
+	local dep_file="$1"
+	: "Searching dependencies from dependency file \"${dep_file}\""
+	IFS=" "
+	while read line; do
+		check_dep "$line" || return 1
+	done < "$dep_file" 
+	return 0
+}
+
+function configure_target() {
+	local target="$1"
+	: "Configuring for target \"${target}\""
+	loop_deps "${TARGETS_DEPS["$target"]}" || return 1
+	"${TARGETS_CFG["$target"]}" || return 1
+	return 0
+}
+
+function loop_targets() {
+	if [[ 0 -eq ${#SELECTED_TARGETS} ]]; then
+		SELECTED_TARGETS=$TARGETS
+	fi
+	for t in ${SELECTED_TARGETS[@]}; do
+		configure_target "$t" || return 1
+	done
+	return 0
+}
+
+function parse_long_opt() {
+	long_opt=$1
+	if [[ "sync=" = ${long_opt:0:7} ]]; then
+		PKGMAN_SYNC="${long_opt:7}"
+	elif [[ "query=" = ${long_opt:0:6} ]]; then
+		PKGMAN_QUERY="${long_opt:6}"
+	else
+		printf "${ID}: Long option \"${long_opt}\" not recognized\n" >&2
+		return 1
+	fi
+	return 0 
+}
+
+function parse_opt() {
+	opt="$1"
+	if [[ "-" = ${opt:0:1} ]]; then
+		parse_long_opt "${opt:1}" || return 1
+	else
+		while IFS= read -n 1 char; do
+			if [[ "" = $char || " " = $char ]]; then
+				break
+			elif [[ "v" = $char ]]; then
+				let "VERBOSITY++"
+			else
+				printf "${ID}: Short option ${char} not recognized" >&2
+				return 1
+			fi
+		done <<< "$opt"
+	fi
+	return 0 
+}
+
+function parse_target() {
+	local target="$1"
+	if [[ ! $TARGETS_DEPS["$target"] ]]; then
+		printf "${ID}: Invalid target \"${target}\" specified\n" &>2
+		return 1
+	fi
+	SELECTED_TARGETS+="$target"
+	return 0
+}
+
+function parse_args() {
+	for a in $@; do
+		if [[ "-" = ${a:0:1} ]]; then
+			parse_opt "${a:1}" || return 1 
+		else
+			parse_target "$a" || return 1
+		fi
+	done
+	return 0
+}
+
+function set_verbosity() {
+	[[ 0 -lt $VERBOSITY ]] && set -x
+}
+
+function message() {
+	set +xv
+	printf "$message"
+	[[ 0 -ne $1 ]] && set_verbosity
+}
+
+parse_args "$@"
+set_verbosity
+loop_targets
+
