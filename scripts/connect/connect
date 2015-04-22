@@ -1,0 +1,149 @@
+#!/bin/bash
+
+# sh-helpers/scripts/shelp-connect
+# Isabell Cowan (c) 2015
+# https://github.com/Izzette/sh-helpers
+
+# Do not remove the lines immediately below, marker for configuration variables
+#$CONFIG_START
+CFG=
+
+# Check if this script is running as root
+if [[ 0 -ne $EUID ]]; then
+	echo "This script must be run as root" >&2
+	exit 1
+fi
+
+source "$CFG"
+
+VERBOSE=0
+CHOICE=()
+IFACE=()
+TYPE=""
+
+function parse_long_opt() {
+	local long_opt=$1
+	if [[ "verbose=" = ${long_opt:0:8} ]]; then
+		VERBOSE="${long_opt:8}"
+	else
+		printf "${ID}: Long option \"${long_opt}\" not recognized\n" >&2
+		exit 1
+	fi
+	return 0 
+}
+
+function parse_opt() {
+	local opt="$1"
+	if [[ "-" = ${opt:0:1} ]]; then
+		parse_long_opt "${opt:1}" || return 1
+	else
+		while IFS= read -n 1 char; do
+			if [[ "" = $char || " " = $char ]]; then
+				break
+			elif [[ "v" = $char ]]; then
+				let "VERBOSE++"
+			elif [[ "q" = $char ]]; then
+				let "VERBOSE--"
+			else
+				printf "${ID}: Short option ${char} not recognized" >&2
+				exit 1
+			fi
+		done <<< "$opt"
+	fi
+	return 0 
+}
+
+function parse_args() {
+	local args=$@
+	for a in $args; do
+		if [[ "-" = ${a:0:1} ]]; then
+			parse_opt "${a:1}" 
+		else
+			CHOICE+=("$a")
+		fi
+	done
+	if [[ 0 -eq ${#CHOICE} ]]; then
+		CHOICE=$DEFAULTS
+	fi
+	return 0
+}
+
+# Check for process instance of wpa_supplicant
+ps -C wpa_supplicant &> $LOG_PATH &&
+# Attempt to terminate cleanly
+wpa_cli terminate ||
+# If all else fails, kill to all instances
+killall -SIGTERM wpa_supplicant
+
+if [[ "default" = ${CHOICE[0]} ]]; then
+	CHOICE=$DEFAULT
+fi
+
+# Multi-dimensional arrays, ugh
+eval "IFACE=\$${GET_IFACE["${CHOICE[0]}"]}"
+
+TYPE=${IFACE["type"]}
+
+if [[ "wifi" = $TYPE ]]; then
+	local mode="${CHOICE[1]}"
+	local protocol="${CHOICE[2]}"
+
+	local name="${IFACE["name"]}"
+	local ud="${IFACE["ud"]}"
+
+	if [[ 0 -ne $ud ]]; then
+		ip link "set" "$name" up
+		iw dev "$name" "set" "type" "$mode"
+	else
+		ip link "set" "$name" down
+		iw dev "$name" "set" "type" "$mode"
+		ip link "set" "$name" up
+	fi
+
+	if [[ "open" == $protocol ]]; then
+		local ssid="${CHOICE[3]}"
+		local freq="${CHOICE[4]}"
+
+		if [[ -z $ssid ]]; then
+			printf "Open network configuration requires an SSID" >&2
+			exit 1
+		fi
+
+		# The lack of quotation marks around $freq prevents it from being passed as an empty string ie. ""
+		iw "$name" connect "$ssid" $freq
+	elif [[ "wpa" == $protocol ]]; then
+		if [[ ! -z ${CHOICE[3]} && ! -z ${CHOICE[3]} ]]; then
+			local ssid="${CHOICE[3]}"
+			local phrase="${CHOICE[4]}"
+
+			wpa_supplicant -B -D nl80211,wext -i "$name" -c <(wpa_passphrase "$ssid" "$phrase")
+		else
+			wpa_supplicant -B -D nl80211,wext -i "$name" -c "$WPA_PATH"
+		fi
+	elif [[ "pass" == $protocol ]]; then
+		if [[ -z $ssid ]]; then
+			printf "WPA passphrase network configuration requires a SSID" >&2
+			exit 1
+		elif [[ -z $phrase ]]; then
+			printf "WPA pass phrase network configuration requires a pass phrase" >&2
+			exit
+		fi
+
+	else
+		printf "Unrecognized protocol \"$protocol\"" >&2
+		exit 1
+	fi
+	
+	dhcpcd "$name"
+elif [[ "wired" == $TYPE ]]; then
+	local name="${IFACE["name"]}"
+
+	ip link "set" "$name" up
+	dhcpcd "$name"
+else
+	printf "Unrecognized connection name \"${CHOICE[0]}\"" >&2
+	exit 1
+fi
+
+exit 0
+

@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# sh-helpers/scripts/connect/configure
+# Isabell Cowan (c) 2015
+# https://github.com/Izzette/sh-helpers
+
+VERBOSE=0
+DIRECTORY=""
+
+function parse_long_opt() {
+	long_opt=$1
+	if [[ "directory=" = ${long_opt:0:10} ]]; then
+		DIRECTORY="${long_opt:10}"
+	elif [[ "verbose=" = ${long_opt:0:8} ]]; then
+		VERBOSE=${long_opt:8}
+	else
+		printf "${ID}: Long option \"${long_opt}\" not recognized\n" >&2
+		exit 1
+	fi
+	return 0 
+}
+
+function parse_opt() {
+	opt="$1"
+	if [[ "-" = ${opt:0:1} ]]; then
+		parse_long_opt "${opt:1}" || return 1
+	else
+		while IFS= read -n 1 char; do
+			if [[ -z $char ]]; then
+				break
+			elif [[ "v" = $char ]]; then
+				let "VERBOSE++"
+			else
+				printf "${ID}: Short option ${char} not recognized" >&2
+				exit 1
+			fi
+		done <<< "$opt"
+	fi
+	return 0 
+}
+
+function parse_args() {
+	args=$@
+	for a in $args; do
+		if [[ "-" = ${a:0:1} ]]; then
+			parse_opt "${a:1}" 
+		else
+			parse_target "$a"
+		fi
+	done
+	return 0
+}
+
+function set_verbosity() {
+	[[ 0 -lt $VERBOSE ]] && set -x
+}
+
+parse_args "$@"
+set_verbosity
+CFG_PATH="${DIRECTORY}connect.conf"
+
+HEADER='#!/bin/bash
+# shelp-connect configuration file
+#
+
+'
+
+printf "$HEADER" > "$CFG_PATH"
+
+WPA_PATH=$(find "/etc/wpa_supplicant/" -name "wpa_supplicant.conf" -print -quit 2> /dev/null)
+
+if [[ -z $WPA_PATH ]]; then
+	printf "Cannot find file named \"wpa_supplicant.conf\" in \"/etc/\"" >&2
+	exit 1
+fi
+
+: "Found \"wpa_supplicant.conf\" at \"${WPA_PATH}\""
+
+printf "WPA_PATH=\"${WPA_PATH}\"\n" >> "$CFG_PATH"
+
+printf "GET_IFACE=()\n" >> "$CFG_PATH"
+
+WIFACE=$(iw dev | grep "Interface" | cut -d " " -f 2)
+printf "${WIFACE}=()\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"${WIFACE}\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"wifi\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "${WIFACE}[\"name\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "${WIFACE}[\"type\"]=\"wifi\"\n" >> "$CFG_PATH"
+printf "# If you get the error \"command failed: Device or resource busy (-16)\", it may be solved by setting \"ud\" to 0\n" >> "$CFG_PATH"
+printf "${WIFACE}[\"ud\"]=1\n" >> "$CFG_PATH"
+

@@ -1,27 +1,30 @@
 #!/bin/bash
+
 # sh-helpers/configure
 # Isabell Cowan (c) 2015
 # https://github.com/Izzette/sh-helpers
-#
 
 SHELP_DIR="$(pwd)/"
 ID="${SHELP_DIR}configure"
-CFG_DIR="${SHELP_DIR}config.d/"
-SRC_DIR="${SHELP_DIR}src/"
-BUILD_DIR="${SHELP_DIR}build/"
+SCRIPTS_DIR="${SHELP_DIR}scripts/"
+CFG_DIR="${SHELP_DIR}configure.d/"
 TARGETS=("connect")
-TARGETS_DIR=
+TARGETS_DIR=()
 TARGETS_DEPS=()
 TARGETS_CFG=()
 for t in ${TARGETS[@]}; do
-	TARGETS_DIR["$t"]="${SRC_DIR}${t}/"
-	TARGETS_DEPS["$t"]="${TARGETS_DIR["$t"]}deps"
-	TARGETS_CFG["$t"]="${TARGETS_DIR["$t"]}configure"
+	TARGETS_DIR["$t"]=${SCRIPTS_DIR}${t}"/"
+	TARGETS_DEPS["$t"]=${TARGETS_DIR["$t"]}"deps"
+	TARGETS_CFG["$t"]=${TARGETS_DIR["$t"]}"configure"
 done
 SELECTED_TARGETS=()
-VERBOSITY=0
+VERBOSE=0
 PKGMAN_SYNC="sudo pacman -S"
 PKGMAN_QUERY="pacman -Qk"
+
+function set_verbosity() {
+	[[ 0 -lt $VERBOSE ]] && set -x
+}
 
 function check_dep() {
 	IFS=" "
@@ -35,7 +38,7 @@ function check_dep() {
 		: "Checking for dependency \"${dep}\" with \"${PKGMAN_QUERY}\" again"
 		${PKGMAN_QUERY[@]} ${dep}
 		if [[ 0 -ne $? ]]; then
-			printf "${ID}: Failed to find or install dependency \"${dep}\" with \"${pkg_man}\"\n" >&2
+			printf "${ID}: Failed to find or install dependency \"${dep}\"\n" >&2
 			return 1
 		fi
 	fi
@@ -43,20 +46,22 @@ function check_dep() {
 }
 
 function loop_deps() {
-	local dep_file="$1"
-	: "Searching dependencies from dependency file \"${dep_file}\""
+	local deps_file="$1"
+	: "Searching dependencies from dependency file \"${deps_file}\""
 	IFS=" "
 	while read line; do
-		check_dep "$line" || return 1
-	done < "$dep_file" 
+		check_dep "$line" || exit 1
+	done < "$deps_file" 
 	return 0
 }
 
 function configure_target() {
 	local target="$1"
 	: "Configuring for target \"${target}\""
-	loop_deps "${TARGETS_DEPS["$target"]}" || return 1
-	"${TARGETS_CFG["$target"]}" || return 1
+	loop_deps "${TARGETS_DEPS["$target"]}"
+	local verbose=0
+	[[ 1 -lt $VERBOSE ]] && verbose=$((VERBOSE - 1))
+	"${TARGETS_CFG["$target"]}" --directory="${CFG_DIR}" --verbose="$verbose" || exit 1
 	return 0
 }
 
@@ -65,20 +70,22 @@ function loop_targets() {
 		SELECTED_TARGETS=$TARGETS
 	fi
 	for t in ${SELECTED_TARGETS[@]}; do
-		configure_target "$t" || return 1
+		configure_target "$t"
 	done
 	return 0
 }
 
 function parse_long_opt() {
 	long_opt=$1
-	if [[ "sync=" = ${long_opt:0:7} ]]; then
-		PKGMAN_SYNC="${long_opt:7}"
+	if [[ "sync=" = ${long_opt:0:5} ]]; then
+		PKGMAN_SYNC="${long_opt:5}"
 	elif [[ "query=" = ${long_opt:0:6} ]]; then
 		PKGMAN_QUERY="${long_opt:6}"
+	elif [[ "verbose=" = ${long_opt:0:8} ]]; then
+		VERBOSE=${long_opt:8}
 	else
 		printf "${ID}: Long option \"${long_opt}\" not recognized\n" >&2
-		return 1
+		exit 1
 	fi
 	return 0 
 }
@@ -92,10 +99,10 @@ function parse_opt() {
 			if [[ "" = $char || " " = $char ]]; then
 				break
 			elif [[ "v" = $char ]]; then
-				let "VERBOSITY++"
+				let "VERBOSE++"
 			else
 				printf "${ID}: Short option ${char} not recognized" >&2
-				return 1
+				exit 1
 			fi
 		done <<< "$opt"
 	fi
@@ -106,25 +113,22 @@ function parse_target() {
 	local target="$1"
 	if [[ ! $TARGETS_DEPS["$target"] ]]; then
 		printf "${ID}: Invalid target \"${target}\" specified\n" &>2
-		return 1
+		exit 1
 	fi
 	SELECTED_TARGETS+="$target"
 	return 0
 }
 
 function parse_args() {
-	for a in $@; do
+	args=$@
+	for a in $args; do
 		if [[ "-" = ${a:0:1} ]]; then
-			parse_opt "${a:1}" || return 1 
+			parse_opt "${a:1}" 
 		else
-			parse_target "$a" || return 1
+			parse_target "$a"
 		fi
 	done
 	return 0
-}
-
-function set_verbosity() {
-	[[ 0 -lt $VERBOSITY ]] && set -x
 }
 
 function message() {
