@@ -6,6 +6,7 @@
 
 VERBOSE=0
 DIRECTORY=""
+ID="${SHELP_DIR}scripts/connect/configure"
 
 function parse_long_opt() {
 	long_opt=$1
@@ -31,7 +32,7 @@ function parse_opt() {
 			elif [[ "v" = $char ]]; then
 				let "VERBOSE++"
 			else
-				printf "${ID}: Short option ${char} not recognized" >&2
+				printf "${ID}: Short option ${char} not recognized\n" >&2
 				exit 1
 			fi
 		done <<< "$opt"
@@ -57,35 +58,57 @@ function set_verbosity() {
 
 parse_args "$@"
 set_verbosity
-CFG_PATH="${DIRECTORY}connect.conf"
 
-HEADER='#!/bin/bash
+CFG_PATH="${DIRECTORY}connect.conf"
+DEFAULTS_PATH="${DIRECTORY}defaults.conf"
+
+printf '#!/bin/bash
 # shelp-connect configuration file
 #
 
-'
+' > "$CFG_PATH"
 
-printf "$HEADER" > "$CFG_PATH"
+printf '# Do not remove the lines immediately below, marker for installation variables
+#$CONFIG_START
+DEFAULTS_PATH=
+
+' >> "$CFG_PATH"
+
+printf "source \"\$DEFAULTS_PATH\"\n\n" >> "$CFG_PATH"
 
 WPA_PATH=$(find "/etc/wpa_supplicant/" -name "wpa_supplicant.conf" -print -quit 2> /dev/null)
 
 if [[ -z $WPA_PATH ]]; then
-	printf "Cannot find file named \"wpa_supplicant.conf\" in \"/etc/\"" >&2
+	printf "${ID}: Cannot find file named \"wpa_supplicant.conf\" in \"/etc/\"\n" >&2
 	exit 1
 fi
 
 : "Found \"wpa_supplicant.conf\" at \"${WPA_PATH}\""
 
-printf "WPA_PATH=\"${WPA_PATH}\"\n" >> "$CFG_PATH"
+printf "WPA_PATH=\"${WPA_PATH}\"\n\n" >> "$CFG_PATH"
 
-printf "GET_IFACE=()\n" >> "$CFG_PATH"
+printf "declare -A GET_IFACE\n\n" >> "$CFG_PATH"
 
 WIFACE=$(iw dev | grep "Interface" | cut -d " " -f 2)
-printf "${WIFACE}=()\n" >> "$CFG_PATH"
 printf "GET_IFACE[\"${WIFACE}\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
 printf "GET_IFACE[\"wifi\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
-printf "${WIFACE}[\"name\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
-printf "${WIFACE}[\"type\"]=\"wifi\"\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"${WIFACE},name\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"${WIFACE},type\"]=\"wifi\"\n" >> "$CFG_PATH"
 printf "# If you get the error \"command failed: Device or resource busy (-16)\", it may be solved by setting \"ud\" to 0\n" >> "$CFG_PATH"
-printf "${WIFACE}[\"ud\"]=1\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"${WIFACE},ud\"]=1\n\n" >> "$CFG_PATH"
+
+EIFACE=$(ip link | grep ": e" | cut -d " " -f 2 | rev | cut -c 2- | rev)
+printf "GET_IFACE[\"${EIFACE}\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"wired\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"${EIFACE},name\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
+printf "GET_IFACE[\"${EIFACE},type\"]=\"wired\"\n\n" >> "$CFG_PATH"
+
+printf '#!/bin/bash
+# shelp-connect default connection configuration
+#
+
+' > "$DEFAULTS_PATH"
+
+printf "# Place default command line parameters here, to use specify no arguments (except options) with shelp-connect\n" >> "$DEFAULTS_PATH"
+printf "DEFAULT=()\n\n" >> "$DEFAULTS_PATH"
 

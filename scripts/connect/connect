@@ -4,22 +4,23 @@
 # Isabell Cowan (c) 2015
 # https://github.com/Izzette/sh-helpers
 
-# Do not remove the lines immediately below, marker for configuration variables
+# Do not remove the lines immediately below, marker for installation variables
 #$CONFIG_START
-CFG=
-
-# Check if this script is running as root
-if [[ 0 -ne $EUID ]]; then
-	echo "This script must be run as root" >&2
-	exit 1
-fi
-
-source "$CFG"
+CFG_PATH=
 
 VERBOSE=0
 CHOICE=()
 IFACE=()
 TYPE=""
+ID="shelp-connect"
+
+# Check if this script is running as root
+if [[ 0 -ne $EUID ]]; then
+	printf "${ID}: This script must be run as root\n" >&2
+	exit 1
+fi
+
+source "$CFG_PATH"
 
 function parse_long_opt() {
 	local long_opt=$1
@@ -45,7 +46,7 @@ function parse_opt() {
 			elif [[ "q" = $char ]]; then
 				let "VERBOSE--"
 			else
-				printf "${ID}: Short option ${char} not recognized" >&2
+				printf "${ID}: Short option ${char} not recognized\n" >&2
 				exit 1
 			fi
 		done <<< "$opt"
@@ -63,33 +64,39 @@ function parse_args() {
 		fi
 	done
 	if [[ 0 -eq ${#CHOICE} ]]; then
-		CHOICE=$DEFAULTS
+		if [[ -z $DEFAULT ]]; then
+			printf "${ID}: No default profile found, you can specify it at \"${DEFUALTS_PATH}\"\n" >&2
+			exit 1
+		fi
+		CHOICE=$DEFAULT
 	fi
 	return 0
 }
 
-# Check for process instance of wpa_supplicant
-ps -C wpa_supplicant &> $LOG_PATH &&
-# Attempt to terminate cleanly
-wpa_cli terminate ||
-# If all else fails, kill to all instances
-killall -SIGTERM wpa_supplicant
+function set_verbosity() {
+	[[ 0 -lt $VERBOSE ]] && set -x
+}
 
-if [[ "default" = ${CHOICE[0]} ]]; then
-	CHOICE=$DEFAULT
+parse_args "$@"
+set_verbosity
+
+# Check for process instance of wpa_supplicant
+ps -C wpa_supplicant &> /dev/null
+if [[ 0 -eq $? ]]; then
+	# Attempt to terminate cleanly
+	wpa_cli terminate ||
+	# If all else fails, kill to all instances
+	killall -SIGTERM wpa_supplicant
 fi
 
-# Multi-dimensional arrays, ugh
-eval "IFACE=\$${GET_IFACE["${CHOICE[0]}"]}"
-
-TYPE=${IFACE["type"]}
+name=${GET_IFACE["${CHOICE[0]}"]}
+TYPE=${GET_IFACE["${name},type"]}
 
 if [[ "wifi" = $TYPE ]]; then
-	local mode="${CHOICE[1]}"
-	local protocol="${CHOICE[2]}"
+	mode="${CHOICE[1]}"
+	protocol="${CHOICE[2]}"
 
-	local name="${IFACE["name"]}"
-	local ud="${IFACE["ud"]}"
+	ud="${GET_IFACE["${name},ud"]}"
 
 	if [[ 0 -ne $ud ]]; then
 		ip link "set" "$name" up
@@ -101,11 +108,11 @@ if [[ "wifi" = $TYPE ]]; then
 	fi
 
 	if [[ "open" == $protocol ]]; then
-		local ssid="${CHOICE[3]}"
-		local freq="${CHOICE[4]}"
+		ssid="${CHOICE[3]}"
+		freq="${CHOICE[4]}"
 
 		if [[ -z $ssid ]]; then
-			printf "Open network configuration requires an SSID" >&2
+			printf "${ID}: Open network configuration requires an SSID\n" >&2
 			exit 1
 		fi
 
@@ -113,8 +120,8 @@ if [[ "wifi" = $TYPE ]]; then
 		iw "$name" connect "$ssid" $freq
 	elif [[ "wpa" == $protocol ]]; then
 		if [[ ! -z ${CHOICE[3]} && ! -z ${CHOICE[3]} ]]; then
-			local ssid="${CHOICE[3]}"
-			local phrase="${CHOICE[4]}"
+			ssid="${CHOICE[3]}"
+			phrase="${CHOICE[4]}"
 
 			wpa_supplicant -B -D nl80211,wext -i "$name" -c <(wpa_passphrase "$ssid" "$phrase")
 		else
@@ -122,26 +129,24 @@ if [[ "wifi" = $TYPE ]]; then
 		fi
 	elif [[ "pass" == $protocol ]]; then
 		if [[ -z $ssid ]]; then
-			printf "WPA passphrase network configuration requires a SSID" >&2
+			printf "${ID}: WPA passphrase network configuration requires a SSID\n" >&2
 			exit 1
 		elif [[ -z $phrase ]]; then
-			printf "WPA pass phrase network configuration requires a pass phrase" >&2
+			printf "${ID}: WPA pass phrase network configuration requires a pass phrase\n" >&2
 			exit
 		fi
 
 	else
-		printf "Unrecognized protocol \"$protocol\"" >&2
+		printf "${ID}: Unrecognized protocol \"$protocol\"\n" >&2
 		exit 1
 	fi
 	
 	dhcpcd "$name"
 elif [[ "wired" == $TYPE ]]; then
-	local name="${IFACE["name"]}"
-
 	ip link "set" "$name" up
 	dhcpcd "$name"
 else
-	printf "Unrecognized connection name \"${CHOICE[0]}\"" >&2
+	printf "${ID}: Unrecognized profile \"${CHOICE[0]}\"\n" >&2
 	exit 1
 fi
 

@@ -4,7 +4,7 @@
 # Isabell Cowan (c) 2015
 # https://github.com/Izzette/sh-helpers
 
-SHELP_DIR="$(pwd)/"
+export SHELP_DIR="$(pwd)/"
 ID="${SHELP_DIR}configure"
 SCRIPTS_DIR="${SHELP_DIR}scripts/"
 CFG_DIR="${SHELP_DIR}configure.d/"
@@ -59,9 +59,11 @@ function configure_target() {
 	local target="$1"
 	: "Configuring for target \"${target}\""
 	loop_deps "${TARGETS_DEPS["$target"]}"
+	local dir="${CFG_DIR}${target}/"
+	[[ ! -f $dir ]] && mkdir "$dir"
 	local verbose=0
 	[[ 1 -lt $VERBOSE ]] && verbose=$((VERBOSE - 1))
-	"${TARGETS_CFG["$target"]}" --directory="${CFG_DIR}" --verbose="$verbose" || exit 1
+	"${TARGETS_CFG["$target"]}" --directory="$dir" --verbose="$verbose" || exit 1
 	return 0
 }
 
@@ -101,7 +103,7 @@ function parse_opt() {
 			elif [[ "v" = $char ]]; then
 				let "VERBOSE++"
 			else
-				printf "${ID}: Short option ${char} not recognized" >&2
+				printf "${ID}: Short option ${char} not recognized\n" >&2
 				exit 1
 			fi
 		done <<< "$opt"
