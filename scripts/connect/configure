@@ -41,12 +41,10 @@ function parse_opt() {
 }
 
 function parse_args() {
-	args=$@
+	local args=$@
 	for a in $args; do
 		if [[ "-" = ${a:0:1} ]]; then
 			parse_opt "${a:1}" 
-		else
-			parse_target "$a"
 		fi
 	done
 	return 0
@@ -68,9 +66,10 @@ printf '#!/bin/bash
 
 ' > "$CFG_PATH"
 
-printf '# Do not remove the lines immediately below, marker for installation variables
-#$CONFIG_START
+printf '# Do not remove the lines immediately below
+#@start
 DEFAULTS_PATH=
+#@end
 
 ' >> "$CFG_PATH"
 
@@ -79,7 +78,7 @@ printf "source \"\$DEFAULTS_PATH\"\n\n" >> "$CFG_PATH"
 WPA_PATH=$(find "/etc/wpa_supplicant/" -name "wpa_supplicant.conf" -print -quit 2> /dev/null)
 
 if [[ -z $WPA_PATH ]]; then
-	printf "${ID}: Cannot find file named \"wpa_supplicant.conf\" in \"/etc/\"\n" >&2
+	printf "${ID}: Cannot find file named \"wpa_supplicant.conf\" in \"/etc/wpa_supplicant/\"\n" >&2
 	exit 1
 fi
 
@@ -87,21 +86,21 @@ fi
 
 printf "WPA_PATH=\"${WPA_PATH}\"\n\n" >> "$CFG_PATH"
 
-printf "declare -A GET_IFACE\n\n" >> "$CFG_PATH"
+printf "declare -A IFACE\n\n" >> "$CFG_PATH"
 
 WIFACE=$(iw dev | grep "Interface" | cut -d " " -f 2)
-printf "GET_IFACE[\"${WIFACE}\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"wifi\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"${WIFACE},name\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"${WIFACE},type\"]=\"wifi\"\n" >> "$CFG_PATH"
+printf "IFACE[\"${WIFACE}\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "IFACE[\"wifi\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "IFACE[\"${WIFACE},name\"]=\"${WIFACE}\"\n" >> "$CFG_PATH"
+printf "IFACE[\"${WIFACE},type\"]=\"wifi\"\n" >> "$CFG_PATH"
 printf "# If you get the error \"command failed: Device or resource busy (-16)\", it may be solved by setting \"ud\" to 0\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"${WIFACE},ud\"]=1\n\n" >> "$CFG_PATH"
+printf "IFACE[\"${WIFACE},ud\"]=1\n\n" >> "$CFG_PATH"
 
 EIFACE=$(ip link | grep ": e" | cut -d " " -f 2 | rev | cut -c 2- | rev)
-printf "GET_IFACE[\"${EIFACE}\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"wired\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"${EIFACE},name\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
-printf "GET_IFACE[\"${EIFACE},type\"]=\"wired\"\n\n" >> "$CFG_PATH"
+printf "IFACE[\"${EIFACE}\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
+printf "IFACE[\"wired\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
+printf "IFACE[\"${EIFACE},name\"]=\"${EIFACE}\"\n" >> "$CFG_PATH"
+printf "IFACE[\"${EIFACE},type\"]=\"wired\"\n\n" >> "$CFG_PATH"
 
 printf '#!/bin/bash
 # shelp-connect default connection configuration

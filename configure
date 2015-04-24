@@ -8,6 +8,7 @@ export SHELP_DIR="$(pwd)/"
 ID="${SHELP_DIR}configure"
 SCRIPTS_DIR="${SHELP_DIR}scripts/"
 CFG_DIR="${SHELP_DIR}configure.d/"
+[[ -d $CFG_DIR ]] || mkdir "$CFG_DIR"
 TARGETS=("connect")
 TARGETS_DIR=()
 TARGETS_DEPS=()
@@ -60,7 +61,7 @@ function configure_target() {
 	: "Configuring for target \"${target}\""
 	loop_deps "${TARGETS_DEPS["$target"]}"
 	local dir="${CFG_DIR}${target}/"
-	[[ ! -f $dir ]] && mkdir "$dir"
+	[[ -d $dir ]] || mkdir "$dir"
 	local verbose=0
 	[[ 1 -lt $VERBOSE ]] && verbose=$((VERBOSE - 1))
 	"${TARGETS_CFG["$target"]}" --directory="$dir" --verbose="$verbose" || exit 1

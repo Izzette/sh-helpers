@@ -1,0 +1,70 @@
+#!/usr/bin/gawk -f
+
+# sh-helpers/replace
+# Isabell Cowan (c) 2015
+# https://github.com/Izzette/sh-helpers
+
+function parse_error(n) {
+	if (1 == n) {
+		print "PARSE ERROR: \"#@start\", \"#@end\" mismatch encountered";
+	}
+	else {
+		print "PARSE ERROR: an unknown error encountered";
+	}
+	exit n;
+}
+
+function get_basename(line) {
+	location = index(line, "=");
+	return substr(line, 0, location - 1);
+}
+
+function parse_vars(vars, parsedVars) {
+	split(vars, splitVars, "|");
+	for (i in splitVars) {
+		key = get_basename(splitVars[i]);
+		parsedVars[key] = splitVars[i];
+	}
+}
+
+BEGIN {
+	inside = 0;
+	parse_vars(vars, parsedVars);
+}
+
+{
+	if ("#@start" == $0) {
+		if (0 == inside) {
+			print $0;
+			inside = 1;
+		}
+		else {
+			parse_error(1);
+		}
+	}
+	else if ("#@end" == $0) {
+		if (1 == inside) {
+			print $0;
+			inside = 0;
+		}
+		else {
+			parse_error(1);
+		}
+	}
+	else if (1 == inside) {
+		for (key in parsedVars) {
+			if (key == get_basename($0)) {
+				print parsedVars[key];
+				break;
+			}
+		}
+	}
+	else {
+		print $0;
+	}
+}
+END {
+	if (1 == inside) {
+		parse_error(1);
+	}
+i}
