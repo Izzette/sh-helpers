@@ -3,53 +3,41 @@ sh-helpers/doc/CHANGELOG.md
 Isabell Cowan (c) 2015
 https://github.com/Izzette/sh-helpers
 -->
-
-##v0.2.0 Installable:
+<!---
+Don't list patches here.
+Instead, append minor version tags.
+-->
+#sh-helpers CHANGELOG
+##v0.2 Installable:
 ###Completed
 * Makefile
   * Can make locally with make
   * Includes make install to /usr/bin/ and /usr/local/etc/sh-helpers/
   * Also includes make clean
 * replace
-  * gawk script to add instalation variables to scripts
+  * gawk script to add installation variables to scripts
 * connect
   * Corrected a plethora errors, everything seems to be functional
   * Renamed GET\_IFACE to IFACE
 
-###Todo
+###To-do
 * Start on other modules
   * "check" for monitoring the progress of directory/file moving, copying, creating by size and rate
   * "recurse" for changing file permissions in shared directories
 
-##v0.1.0 Connect functional:
+##v0.1 Connect functional:
 ###Completed
 * connect
   * configures properly from main configuration script
-  * runs properly with manually added instalation variables
+  * runs properly with manually added installation variables
  
-###Todo:
+###To-do:
 * connect
-  * Test under more scrutiney
+  * Test under more scrutiny
 * Makefile
   * Start the makefile
 
-##v0.0.1 Main configuration script complete:
-###Completed
-* configure script complete
-  * Checks for dependencies
-  * Excecutes sub-configuration scripts
-  * Allows for verbosity to be set with options
-  * Full command line parsing architecture
-* connect
-  * configure script almost complete
-* Reworked directory tree
-
-###Todo
-* connect
-  * Complete and test configure script
-  * Write connect scripts
-
-##v0.0.0 Initial commit:
+##v0.0 Initial commit:
 ###Goals
 * connect
   * Connect to the internet with command-line parameters
@@ -63,4 +51,19 @@ https://github.com/Izzette/sh-helpers
 * Makfile
   * Places installation variables (configuration file paths) in each target
   * Includes install
+
+###Completed
+* configure script complete
+  * Checks for dependencies
+  * Excecutes sub-configuration scripts
+  * Allows for verbosity to be set with options
+  * Full command line parsing architecture
+* connect
+  * configure script almost complete
+* Reworked directory tree
+
+###To-do
+* connect
+  * Complete and test configure script
+  * Write connect scripts
 
