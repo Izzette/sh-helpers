@@ -99,12 +99,10 @@ TYPE=${IFACE["${NAME},type"]}
 function kill_wpa() {
 	# Check for process instance of wpa_supplicant
 	local inst=$(($(ps -C wpa_supplicant | wc -l) - 1))
-	if [[ 1 -eq $inst ]]; then
+	if [[ 0 -ne $inst ]]; then
 		# Attempt to terminate cleanly
-		wpa_cli terminate
-	elif [[ 1 -lt $inst ]]; then
 		# If all else fails, kill to all instances
-		killall -SIGTERM wpa_supplicant
+		wpa_cli terminate &> /dev/null || killall -SIGTERM wpa_supplicant
 	fi
 	return 0
 }
