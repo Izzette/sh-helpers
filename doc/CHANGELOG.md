@@ -19,6 +19,8 @@ Instead, append minor version tags.
 * connect
   * Corrected a plethora errors, everything seems to be functional
   * Renamed GET\_IFACE to IFACE
+  * Fixed wpa\_supplicant terminate
+  * Fixed open network connection with iw (missing "dev")
 
 ###To-do
 * Start on other modules
@@ -42,10 +44,10 @@ Instead, append minor version tags.
 * connect
   * Connect to the internet with command-line parameters
   * All configuration files in bash
-  * Configuration in $CONFIG_DIR/connect/connect.conf
-  * Includes default connection profile, in $CONFIG_DIR/connect/defaults.conf
+  * Configuration in $CONFIG\_DIR/connect/connect.conf
+  * Includes default connection profile, in $CONFIG\_DIR/connect/defaults.conf
 * configure
-  * Check for dependencies in scripts/*/deps
+  * Check for dependencies in scripts/\*/deps
   * Attempts to install dependencies with package manages
   * Create subshell for each targets individual configuration script
 * Makfile

@@ -132,7 +132,7 @@ function connect_wifi() {
 		fi
 
 		# The lack of quotation marks around $freq prevents it from being passed as an empty string ie. ""
-		iw "$NAME" connect "$ssid" $freq
+		iw dev "$NAME" connect "$ssid" $freq
 	elif [[ "wpa" == $protocol ]]; then
 		if [[ ! -z ${CHOICE[3]} && ! -z ${CHOICE[4]} ]]; then
 			local ssid="${CHOICE[3]}"
